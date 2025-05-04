@@ -20,3 +20,4 @@ def apply_coupon(request):
             message = "Купон недействителен"
     
     return render(request, 'coupon/apply.html', {'form': form, 'message': message})
+ 

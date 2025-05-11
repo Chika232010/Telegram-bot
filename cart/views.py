@@ -1,7 +1,10 @@
+import stripe
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
+stripe.api_key = settings.STRIPE_SECRET_KEY
 from django.contrib.auth.decorators import login_required
 from .models import Cart, CartItem
-from shop.models import Product
+from catalog.models import Product
 
 def view_cart(request):
     cart, created = Cart.objects.get_or_create(user=request.user)
@@ -33,3 +36,44 @@ def remove_from_cart(request, product_id):
     cart_item = get_object_or_404(CartItem, cart=cart, product_id=product_id)
     cart_item.delete()
     return redirect('view_cart')
+
+
+def create_checkout_session(request):
+    cart = Cart(request)
+    items = []
+
+    for item in cart:
+        product = item['product']
+        items.append({
+            'price_data': {
+                'currency': 'usd',
+                'product_data': {
+                    'name': product.name,
+                },
+                'unit_amount': int(product.price * 100),
+            },
+            'quantity': item['quantity'],
+        })
+
+    if not items:
+        return redirect('cart:cart_detail')
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=['card'],
+        line_items=items,
+        mode='payment',
+        success_url='http://localhost:8000/cart/success/',
+        cancel_url='http://localhost:8000/cart/cancel/',
+    )
+
+    return redirect(session.url, code=303)
+
+
+
+
+def payment_success(request):
+ 
+    request.session['cart'] = {}
+    return render(request, 'cart/payment_success.html')
+def payment_cancel(request):
+    return render(request, 'cart/payment_cancel.html')
